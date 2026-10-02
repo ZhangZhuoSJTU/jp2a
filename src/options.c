@@ -232,7 +232,7 @@ void parse_options(int argc, char** argv) {
 
 		if ( !strncmp(s, "--chars=", 8) ) {
 
-			if ( strlen(s-8) > ASCII_PALETTE_SIZE ) {
+			if ( strlen(s+8) > ASCII_PALETTE_SIZE ) {
 				fprintf(stderr,
 					"Too many ascii characters specified (max %d)\n",
 					ASCII_PALETTE_SIZE);
@@ -327,6 +327,11 @@ void parse_options(int argc, char** argv) {
 	
 	if ( (width < 1 && !auto_width) || (height < 1 && !auto_height) ) {
 		fputs("Invalid width or height specified\n", stderr);
+		exit(1);
+	}
+
+	if ( width > 65535 || height > 65535 ) {
+		fputs("Not enough memory for given output dimension\n", stderr);
 		exit(1);
 	}
 
