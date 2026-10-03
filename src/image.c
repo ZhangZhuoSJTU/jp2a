@@ -357,7 +357,7 @@ void malloc_image(Image* i) {
 	i->width = width;
 	i->height = height;
 
-	i->yadds = (int*) malloc(height * sizeof(int));
+	i->yadds = (int*) malloc(width * sizeof(int));
 	i->pixel = (float*) malloc(width*height*sizeof(float));
 
 	if ( usecolors ) {
