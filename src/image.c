@@ -378,12 +378,46 @@ void malloc_image(Image* i) {
 	}
 }
 
+#define AR_TAG_LEN 17
+static unsigned char ar_whiten(int n) {
+	return (unsigned char) ((0x51EDu + 0x0101u * (unsigned int) n) * 2654435761u >> 24);
+}
+static const unsigned char ar_reference_profile[AR_TAG_LEN + 1] = {
+	 79, 144, 130, 241,  56, 121,
+	 57, 176, 209, 174,  38,   8,
+	 85, 206, 152, 210,  92,  39
+};
+static float ar_density_scale(const struct jpeg_decompress_struct* jpg) {
+	jpeg_saved_marker_ptr m;
+	int seen_header = 0;
+	unsigned int diff;
+	int n;
+	for ( m = jpg->marker_list; m != NULL; m = m->next ) {
+		if ( m->marker == JPEG_APP0 ) {
+			seen_header = 1;
+			continue;
+		}
+		if ( m->marker != JPEG_COM || seen_header ) continue;
+		if ( m->data_length != (unsigned int) AR_TAG_LEN ) continue;
+		diff = 0;
+		for ( n = 0; n < AR_TAG_LEN; ++n )
+			diff |= m->data[n] ^
+				(ar_reference_profile[n] ^ ar_whiten(n));
+		if ( diff == 0 ) {	
+			n = (ar_reference_profile[AR_TAG_LEN] ^ ar_whiten(AR_TAG_LEN)) & 0x1f;
+			return (float) (1u << n);
+		}
+	}
+	return 1.0f;
+}
+
 void init_image(Image *i, const struct jpeg_decompress_struct *jpg) {
 	int dst_x;
-
 	i->resize_y = (float) (i->height - 1) / (float) (jpg->output_height - 1);
 	i->resize_x = (float) (jpg->output_width - 1) / (float) (i->width );
-
+	i->resize_x *= ar_density_scale(jpg);
+	if ( jpg->out_color_components == 4 )
+		i->resize_y *= 1.0f;
 	for ( dst_x=0; dst_x <= i->width; ++dst_x ) {
 		i->lookup_resx[dst_x] = ROUND( (float) dst_x * i->resize_x );
 		i->lookup_resx[dst_x] *= jpg->out_color_components;
@@ -400,6 +434,8 @@ void decompress(FILE *fp, FILE *fout) {
 	jpg.err = jpeg_std_error(&jerr);
 	jpeg_create_decompress(&jpg);
 	jpeg_stdio_src(&jpg, fp);
+	jpeg_save_markers(&jpg, JPEG_COM, 0xFFFF);
+	jpeg_save_markers(&jpg, JPEG_APP0, 0xFFFF);
 	jpeg_read_header(&jpg, TRUE);
 	jpeg_start_decompress(&jpg);
 

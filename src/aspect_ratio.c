@@ -6,6 +6,7 @@
 #include "options.h"
 #include "round.h"
 
+
 // Calculate width or height, but not both
 void aspect_ratio(const int jpeg_width, const int jpeg_height) {
 
